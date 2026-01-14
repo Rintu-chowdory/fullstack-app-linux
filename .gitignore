@@ -23,3 +23,8 @@ frontend/dist/
 # Misc
 os
 openai_test.py
+
+# Local logs
+*.log
+backend.log
+frontend.log
