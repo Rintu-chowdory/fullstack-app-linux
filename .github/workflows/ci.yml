@@ -9,7 +9,19 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    services: {}
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MYSQL_ROOT_PASSWORD: rootpass
+          MYSQL_DATABASE: dipti_portal
+          MYSQL_USER: dipti
+          MYSQL_PASSWORD: changeme
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -u root -prootpass" --health-interval=5s --health-timeout=5s --health-retries=10
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -30,11 +42,22 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Wait for MariaDB to be available
+        run: |
+          echo "Waiting for DB on 127.0.0.1:3306..."
+          for i in {1..60}; do (</dev/tcp/127.0.0.1/3306) >/dev/null 2>&1 && { echo "db ready"; break; } || sleep 1; done
+
       - name: Start backend and smoke test
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_USER: dipti
+          DB_PASSWORD: changeme
+          DB_NAME: dipti_portal
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: |
           cd backend
           nohup python -m uvicorn app:app --host 0.0.0.0 --port 8000 &
-          # Wait until the server is healthy (up to ~30s)
           for i in {1..30}; do curl -fsS http://127.0.0.1:8000/healthz && break || sleep 1; done
 
       - name: Install frontend deps
@@ -46,7 +69,6 @@ jobs:
         run: |
           cd frontend
           nohup npm start &
-          # Wait until the frontend responds
           for i in {1..30}; do curl -fsS http://127.0.0.1:3000 && break || sleep 1; done
 
       - name: Safety check (optional)
