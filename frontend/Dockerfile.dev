@@ -1,0 +1,9 @@
+FROM node:24
+
+WORKDIR /app
+
+COPY package.json package-lock.json* /app/
+RUN npm ci --silent
+
+# Mount source into container for development
+CMD ["npm", "run", "dev"]
