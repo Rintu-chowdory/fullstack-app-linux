@@ -9,6 +9,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      TZ: Europe/Berlin
     services:
       mariadb:
         image: mariadb:10.11
