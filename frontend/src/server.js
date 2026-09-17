@@ -1,4 +1,5 @@
 import express from "express";
+import helmet from "helmet";
 import session from "express-session";
 import multer from "multer";
 import FormData from "form-data";
@@ -17,6 +18,16 @@ const PORT = Number(process.env.PORT || 3000);
 const SESSION_SECRET = process.env.SESSION_SECRET || "dev-secret";
 
 const app = express();
+
+// Security headers (helmet was in package.json but never used)
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: { "img-src": ["'self'", "data:", "http:"], "script-src": ["'self'", "unsafe-inline'"] },
+    },
+  })
+);
 
 // View engine
 app.set("view engine", "ejs");

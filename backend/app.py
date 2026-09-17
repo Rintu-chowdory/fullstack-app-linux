@@ -1,4 +1,5 @@
-import os, io
+import os, io, secrets
+from datetime import datetime, timedelta, timezone
 from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -12,31 +13,52 @@ from PIL import Image
 from database import SessionLocal, Base, engine
 from models import User, StudentSubmission, Student
 
-JWT_SECRET = os.getenv("JWT_SECRET", "change_this_secret")
+JWT_SECRET = os.getenv("JWT_SECRET", "")
+if not JWT_SECRET or JWT_SECRET in ("change_this_secret", "changeme"):
+    raise RuntimeError(
+        "JWT_SECRET is missing or still the default. Set a strong random value "
+        "in .env (e.g. `openssl rand -hex 32`). See .env.example."
+    )
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/opt/dipti/fullstack-app-linux/backend/uploads")
+MAX_PHOTO_BYTES = int(os.getenv("MAX_PHOTO_BYTES", str(5 * 1024 * 1024)))
 os.makedirs(os.path.join(UPLOAD_DIR, "students"), exist_ok=True)
 
 auth_scheme = HTTPBearer(auto_error=False)
 student_scheme = HTTPBearer(auto_error=False)
 
 app = FastAPI(title="DIPTI Backend API v2")
+# Tokens travel in the Authorization header, so cookies/credentials are not
+# needed — allow_credentials=True with wildcard origins is rejected by browsers.
+CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=CORS_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 Base.metadata.create_all(bind=engine)
 
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
+
 def ensure_admin():
+    """Create the admin user on first boot.
+
+    Password comes from ADMIN_PASSWORD; if unset, a random one is generated
+    and printed once so the operator can log in (and then rotate it).
+    """
     db = SessionLocal()
     try:
-        if not db.query(User).filter_by(username="admin").first():
-            db.add(User(username="admin", password_hash=bcrypt.hash("admin123"), role="admin"))
+        if not db.query(User).filter_by(username=ADMIN_USERNAME).first():
+            pwd = ADMIN_PASSWORD or secrets.token_urlsafe(16)
+            db.add(User(username=ADMIN_USERNAME, password_hash=bcrypt.hash(pwd), role="admin"))
             db.commit()
+            if not ADMIN_PASSWORD:
+                print(f"[setup] admin user '{ADMIN_USERNAME}' created with generated "
+                      f"password: {pwd}  (set ADMIN_PASSWORD in .env to control this)")
     finally:
         db.close()
 ensure_admin()
@@ -63,6 +85,15 @@ class StudentIn(BaseModel):
     module: str
     email: EmailStr
 
+TOKEN_TTL_HOURS = int(os.getenv("TOKEN_TTL_HOURS", "8"))
+
+def make_token(sub, kind, **extra):
+    """HS256 token with iat/exp (UTC, Europe/Berlin-safe)."""
+    now = datetime.now(timezone.utc)
+    payload = {"sub": sub, "kind": kind, "iat": now, "exp": now + timedelta(hours=TOKEN_TTL_HOURS)}
+    payload.update(extra)
+    return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
+
 @app.get("/healthz")
 def healthz():
     return {"status": "ok"}
@@ -72,8 +103,7 @@ def login(payload: LoginIn, db: Session = Depends(get_db)):
     user = db.query(User).filter_by(username=payload.username).first()
     if not user or not bcrypt.verify(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
-    token = jwt.encode({"sub": user.username, "role": user.role, "kind": "admin"}, JWT_SECRET, algorithm="HS256")
-    return {"token": token}
+    return {"token": make_token(user.username, "admin", role=user.role)}
 
 def require_admin(creds: HTTPAuthorizationCredentials = Depends(auth_scheme)):
     if not creds:
@@ -113,8 +143,12 @@ async def student_register(
         raise HTTPException(400, detail="Email already registered")
 
     raw = await photo.read()
+    if len(raw) > MAX_PHOTO_BYTES:
+        raise HTTPException(400, detail=f"Photo too large (max {MAX_PHOTO_BYTES // (1024*1024)} MB)")
     try:
-        im = Image.open(io.BytesIO(raw)).convert("RGB")
+        im = Image.open(io.BytesIO(raw))
+        im.load()  # decompresses fully: catches truncated files & pixel bombs
+        im = im.convert("RGB")
     except Exception:
         raise HTTPException(400, detail="Invalid image")
     target = (256, 256)
@@ -156,8 +190,7 @@ def student_login(payload: StudentLoginIn, db: Session = Depends(get_db)):
     s = db.query(Student).filter_by(email=str(payload.email)).first()
     if not s or not bcrypt.verify(payload.password, s.password_hash):
         raise HTTPException(401, detail="Invalid email or password")
-    token = jwt.encode({"sub": s.email, "sid": s.id, "kind": "student"}, JWT_SECRET, algorithm="HS256")
-    return {"token": token}
+    return {"token": make_token(s.email, "student", sid=s.id)}
 
 def require_student(creds: HTTPAuthorizationCredentials = Depends(student_scheme)):
     if not creds:
@@ -172,7 +205,7 @@ def require_student(creds: HTTPAuthorizationCredentials = Depends(student_scheme
 
 @app.get("/api/student/me")
 def student_me(auth=Depends(require_student), db: Session = Depends(get_db)):
-    s = db.query(Student).get(auth["sid"])
+    s = db.get(Student, auth["sid"])
     if not s:
         raise HTTPException(404, detail="Not found")
     photo_url = f"/uploads/{s.profile_image_path}" if s.profile_image_path else None

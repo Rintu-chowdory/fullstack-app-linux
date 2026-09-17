@@ -46,7 +46,7 @@ This guide provides a **step-by-step setup** of a 6-VM/server architecture with 
 ```bash
 sudo apt update && sudo apt -y upgrade
 sudo apt -y install curl git
-sudo timedatectl set-timezone Asia/Dhaka
+sudo timedatectl set-timezone Europe/Berlin   # adjust if your nodes run in another European timezone
 ```
 
 #### ⚙️ Step 2: Configure Firewall(Disable)

@@ -2,6 +2,9 @@ FROM node:24
 
 WORKDIR /app
 
+# European time (node:24 image ships tzdata, so TZ is enough)
+ENV TZ=Europe/Berlin
+
 COPY package.json package-lock.json* /app/
 RUN npm ci --silent
 
