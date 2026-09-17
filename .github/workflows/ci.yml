@@ -56,7 +56,8 @@ jobs:
           DB_USER: dipti
           DB_PASSWORD: changeme
           DB_NAME: dipti_portal
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET || 'ci-only-secret-for-tests' }}
+          ADMIN_PASSWORD: ci-admin-password
         run: |
           cd backend
           nohup python -m uvicorn app:app --host 0.0.0.0 --port 8000 &
@@ -72,6 +73,50 @@ jobs:
           cd frontend
           nohup npm start &
           for i in {1..30}; do curl -fsS http://127.0.0.1:3000 && break || sleep 1; done
+
+      - name: API smoke test (login, admin create, register, student flow)
+        env:
+          JWT_SECRET: ci-only-secret-for-tests
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_USER: dipti
+          DB_PASSWORD: changeme
+          DB_NAME: dipti_portal
+        run: |
+          set -e
+          cd backend
+          python - <<'PY'
+          from PIL import Image
+          Image.new("RGB", (64, 64), "green").save("/tmp/photo.png")
+          PY
+          # admin login
+          ADMIN_TOKEN=$(curl -fsS -X POST http://127.0.0.1:8000/api/login \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"admin","password":"ci-admin-password"}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])')
+          echo "admin login OK"
+          # admin creates a student submission (auth required)
+          curl -fsS -X POST http://127.0.0.1:8000/api/students \
+            -H "Authorization: Bearer $ADMIN_TOKEN" \
+            -H 'Content-Type: application/json' \
+            -d '{"name":"Test","institute":"ITCS","batch":"2026","course_name":"Linux","module":"HA","email":"test@example.com"}'
+          echo "admin create OK"
+          # unauthenticated create must be rejected
+          CODE=$(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:8000/api/students \
+            -H 'Content-Type: application/json' -d '{"name":"x","institute":"x","batch":"x","course_name":"x","module":"x","email":"x@x.de"}')
+          [ "$CODE" = "401" ] || { echo "expected 401 without token, got $CODE"; exit 1; }
+          echo "auth rejection OK"
+          # student registration with photo
+          curl -fsS -X POST http://127.0.0.1:8000/api/students/register \
+            -F 'name=Rintu Test' -F 'institute=ITCS' -F 'batch=2026' -F 'course_name=Linux' \
+            -F 'module=HA' -F 'email=student@example.com' -F 'password=supersecret123' \
+            -F 'photo=@/tmp/photo.png;type=image/png'
+          echo "student registration OK"
+          # student login + me
+          STU_TOKEN=$(curl -fsS -X POST http://127.0.0.1:8000/api/student/login \
+            -H 'Content-Type: application/json' \
+            -d '{"email":"student@example.com","password":"supersecret123"}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])')
+          curl -fsS http://127.0.0.1:8000/api/student/me -H "Authorization: Bearer $STU_TOKEN" | grep -q '"name":"Rintu Test"'
+          echo "student login + me OK"
 
       - name: Safety check (optional)
         run: |
