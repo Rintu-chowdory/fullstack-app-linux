@@ -6,6 +6,7 @@ services:
     container_name: dipti-db
     restart: unless-stopped
     environment:
+      TZ: Europe/Berlin
       MYSQL_ROOT_PASSWORD: rootpass
       MYSQL_DATABASE: dipti_portal
       MYSQL_USER: dipti
@@ -31,6 +32,7 @@ services:
       - ./backend:/app
       - ./backend/uploads:/app/uploads
     environment:
+      TZ: Europe/Berlin
       DB_HOST: db
       DB_PORT: 3306
       DB_USER: dipti
@@ -54,6 +56,7 @@ services:
       - ./frontend:/app
       - /app/node_modules
     environment:
+      TZ: Europe/Berlin
       PORT: 3000
       BACKEND_URL: http://backend:8000
     ports:
