@@ -1,32 +1,28 @@
-# Docker Compose (development)
+# Docker
 
-This file explains how to run the app stack locally with Docker Compose.
-
-Start the stack (build images on first run):
+## Dev stack (single app pair)
 
 ```bash
+cp .env.example .env    # set JWT_SECRET, SESSION_SECRET, ADMIN_PASSWORD, DB_PASSWORD
 docker compose up --build -d
 ```
 
-View logs:
+The `migrate` service runs `alembic upgrade head` once; the backend waits for
+it (`service_completed_successfully`).
+
+## HA lab (single machine, full topology)
 
 ```bash
-docker compose logs -f backend
+docker compose -f docker-compose.prod.yml up --build -d
 ```
 
-Stop the stack:
+2 HAProxy/Keepalived LBs with VIP 172.28.0.13, two app pairs, MariaDB, shared
+uploads volume. Host ports: lb1 8081, lb2 8082, stats 8404.
 
-```bash
-docker compose down
-```
+## Images
 
-Notes:
-- Backend: http://localhost:8000 (health: /healthz)
-- Frontend: http://localhost:3000
+- `backend/Dockerfile` - python:3.12-slim, non-root, healthchecked
+- `frontend/Dockerfile` - node:20-alpine, non-root, healthchecked
+- `haproxy/Dockerfile.lb` - haproxy:2.9-alpine + keepalived
 
-You can customize credentials in `.env` or use `.env.example` as a template.
-
-The stack includes:
-- `db` (MariaDB) with initial schema from `db/schema.sql`
-- `backend` (FastAPI / uvicorn) built from `backend/Dockerfile.dev`
-- `frontend` (Node / Express) built from `frontend/Dockerfile.dev`
+Keepalived needs `cap_add: [NET_ADMIN, NET_RAW]` (set in the compose file).

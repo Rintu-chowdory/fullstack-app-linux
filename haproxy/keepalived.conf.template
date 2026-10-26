@@ -1,0 +1,33 @@
+global_defs {
+    router_id dipti-@ROLE@
+}
+
+vrrp_script chk_haproxy {
+    script "/usr/bin/pgrep haproxy"
+    interval 2
+    weight 0
+    fall 2
+    rise 2
+}
+
+vrrp_instance VI_1 {
+    state @ROLE@
+    interface eth0
+    virtual_router_id 51
+    priority @PRIORITY@
+    advert_int 1
+    authentication {
+        auth_type PASS
+        auth_pass @VRRP_PASSWORD@
+    }
+    unicast_src_ip @SELF_IP@
+    unicast_peer {
+        @PEER_IP@
+    }
+    virtual_ipaddress {
+        @VIP@/16
+    }
+    track_script {
+        chk_haproxy
+    }
+}

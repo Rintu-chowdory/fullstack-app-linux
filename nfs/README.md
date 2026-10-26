@@ -1,13 +1,24 @@
-## NFS Server Installation
-- IP `192.168.1.17`	of NFS shared storage
+# NFS shared storage (nfs1)
 
-```sh
-sudo apt -y install nfs-kernel-server
-sudo mkdir -p /srv/dipti-uploads/students
-sudo chown -R www-data:www-data /srv/dipti-uploads   #sudo chown -R nobody:nogroup /srv/dipti-uploads
-echo "/srv/dipti-uploads 192.168.1.0/24(rw,sync,no_subtree_check)" | sudo tee -a /etc/exports
-sudo exportfs -ar
-sudo systemctl enable --now nfs-server || sudo systemctl enable --now nfs-kernel-server
+The 6-node lab stores student photos on NFS so both app servers see the same
+uploads directory.
+
+## On nfs1 (192.168.1.17)
+
+```bash
+sudo ./setup-nfs-server.sh
 ```
 
+(or install `nfs-kernel-server` yourself and copy `exports` to `/etc/exports`)
 
+## On app1 (192.168.1.14) and app2 (192.168.1.15)
+
+```bash
+sudo ./mount-app-server.sh
+```
+
+Then set `UPLOAD_DIR=/opt/dipti/uploads` in the backend environment on both app
+servers so photos are written to the share.
+
+In `docker-compose.prod.yml` the shared `uploads_nfs` volume plays the role of
+nfs1 on a single machine.

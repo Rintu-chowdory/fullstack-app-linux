@@ -1,0 +1,158 @@
+# Single-machine HA lab: simulates the full 6-node topology (lb1/lb2 + VRRP VIP,
+# app1/app2 pairs, db, shared uploads volume standing in for nfs1) on ONE host.
+# Requires Linux + Docker with NET_ADMIN for keepalived inside the LB containers.
+#
+#   cp .env.example .env   # set JWT_SECRET, SESSION_SECRET, ADMIN_PASSWORD, DB_PASSWORD, VRRP_PASSWORD, STATS_PASSWORD
+#   docker compose -f docker-compose.prod.yml up --build -d
+#
+# Test failover:  docker compose -f docker-compose.prod.yml stop app1-backend
+#   -> HAProxy health checks drop that node within ~6s, traffic goes to app2.
+# Kill lb1 -> keepalived moves the VIP to lb2.
+#
+# Traffic: client -> lb1/lb2 (VIP .0.13, or host ports 8081/8082) -> app frontends -> local backends -> db
+name: dipti-ha
+
+networks:
+  dipti_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+volumes:
+  db_data:
+  uploads_nfs:   # stands in for the NFS share in the 6-node lab
+
+services:
+  db:
+    image: mariadb:10.11
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set in .env}
+      MYSQL_DATABASE: dipti_portal
+      MYSQL_USER: dipti
+      MYSQL_PASSWORD: ${DB_PASSWORD:?set in .env}
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      dipti_net:
+        ipv4_address: 172.28.0.16
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    build: { context: ./backend, dockerfile: Dockerfile }
+    restart: "no"
+    command: ["python", "-m", "alembic", "upgrade", "head"]
+    environment: &db_env
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: dipti
+      DB_PASSWORD: ${DB_PASSWORD:?set in .env}
+      DB_NAME: dipti_portal
+      JWT_SECRET: ${JWT_SECRET:?set in .env}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set in .env}
+      UPLOAD_DIR: /app/uploads
+    depends_on:
+      db: { condition: service_healthy }
+    networks: [dipti_net]
+
+  app1-backend:
+    build: { context: ./backend, dockerfile: Dockerfile }
+    restart: unless-stopped
+    environment: *db_env
+    volumes:
+      - uploads_nfs:/app/uploads
+    networks:
+      dipti_net: { ipv4_address: 172.28.0.14 }
+    depends_on:
+      db: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+
+  app2-backend:
+    build: { context: ./backend, dockerfile: Dockerfile }
+    restart: unless-stopped
+    environment: *db_env
+    volumes:
+      - uploads_nfs:/app/uploads
+    networks:
+      dipti_net: { ipv4_address: 172.28.0.15 }
+    depends_on:
+      db: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+
+  app1-frontend:
+    build: { context: ./frontend, dockerfile: Dockerfile }
+    restart: unless-stopped
+    environment: &fe_env
+      BACKEND_API_BASE_URL: http://app1-backend:8000
+      SESSION_SECRET: ${SESSION_SECRET:?set in .env}
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: dipti
+      DB_PASSWORD: ${DB_PASSWORD:?set in .env}
+      DB_NAME: dipti_portal
+      COOKIE_SECURE: "0"
+    networks: [dipti_net]
+    depends_on: [app1-backend]
+
+  app2-frontend:
+    build: { context: ./frontend, dockerfile: Dockerfile }
+    restart: unless-stopped
+    environment:
+      <<: *fe_env
+      BACKEND_API_BASE_URL: http://app2-backend:8000
+    networks: [dipti_net]
+    depends_on: [app2-backend]
+
+  lb1:
+    build:
+      context: ./haproxy
+      dockerfile: Dockerfile.lb
+    restart: unless-stopped
+    environment:
+      APP1_HOST: app1-frontend
+      APP2_HOST: app2-frontend
+      STATS_USER: admin
+      STATS_PASSWORD: ${STATS_PASSWORD:?set in .env}
+      KEEPALIVED_ENABLED: "1"
+      KEEPALIVED_ROLE: MASTER
+      KEEPALIVED_PRIORITY: "150"
+      KEEPALIVED_SELF_IP: 172.28.0.11
+      KEEPALIVED_PEER_IP: 172.28.0.12
+      KEEPALIVED_VIP: 172.28.0.13
+      VRRP_PASSWORD: ${VRRP_PASSWORD:?set in .env}
+    cap_add: [NET_ADMIN, NET_RAW]
+    ports:
+      - "8081:80"
+      - "8404:8404"
+    networks:
+      dipti_net: { ipv4_address: 172.28.0.11 }
+    depends_on: [app1-frontend, app2-frontend]
+
+  lb2:
+    build:
+      context: ./haproxy
+      dockerfile: Dockerfile.lb
+    restart: unless-stopped
+    environment:
+      APP1_HOST: app1-frontend
+      APP2_HOST: app2-frontend
+      STATS_USER: admin
+      STATS_PASSWORD: ${STATS_PASSWORD:?set in .env}
+      KEEPALIVED_ENABLED: "1"
+      KEEPALIVED_ROLE: BACKUP
+      KEEPALIVED_PRIORITY: "100"
+      KEEPALIVED_SELF_IP: 172.28.0.12
+      KEEPALIVED_PEER_IP: 172.28.0.11
+      KEEPALIVED_VIP: 172.28.0.13
+      VRRP_PASSWORD: ${VRRP_PASSWORD:?set in .env}
+    cap_add: [NET_ADMIN, NET_RAW]
+    ports:
+      - "8082:80"
+    networks:
+      dipti_net: { ipv4_address: 172.28.0.12 }
+    depends_on: [app1-frontend, app2-frontend]

@@ -1,0 +1,2 @@
+# /etc/exports on nfs1 - shared uploads directory for app1 + app2
+/srv/dipti/uploads 192.168.1.14(rw,sync,no_subtree_check,no_root_squash) 192.168.1.15(rw,sync,no_subtree_check,no_root_squash)
