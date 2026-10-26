@@ -91,7 +91,7 @@ jobs:
           exit 1
       - name: Student journey (register + login + profile)
         run: |
-          python -c "from PIL import Image; Image.new('RGB',(64,64)).save('/tmp/p.png')"
+          python -c "import base64; open('/tmp/p.png','wb').write(base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='))"
           curl -s -c /tmp/jar -o /dev/null http://127.0.0.1:3000/student/register
           CSRF=$(curl -s -b /tmp/jar -c /tmp/jar http://127.0.0.1:3000/student/register | grep -o 'name="_csrf" value="[^"]*"' | sed 's/.*value="//;s/"//')
           curl -sf -b /tmp/jar -c /tmp/jar -o /dev/null -X POST http://127.0.0.1:3000/student/register \
