@@ -28,3 +28,6 @@ openai_test.py
 *.log
 backend.log
 frontend.log
+
+# Backups
+backups/

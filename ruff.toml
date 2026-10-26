@@ -1,0 +1,4 @@
+# FastAPI idioms use Depends(...) as default args (B008); the health check and
+# error handler intentionally catch broad exceptions (BLE001).
+[lint]
+ignore = ["B008", "BLE001"]
