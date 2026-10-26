@@ -1,81 +1,28 @@
+# Backend (FastAPI)
+
+## Env vars (required unless noted)
+
+| Var | Meaning |
+|-----|---------|
+| `JWT_SECRET` | token signing secret (required) |
+| `DB_PASSWORD` (+ `DB_HOST/PORT/NAME/USER`) | MariaDB connection, or full `DATABASE_URL` |
+| `ADMIN_PASSWORD` | initial admin password; random one logged if unset on fresh DB |
+| `UPLOAD_DIR` | uploads dir (default `./uploads`) |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | token lifetime (default 480) |
+| `CORS_ORIGINS` | comma-separated allowed origins |
+| `MAX_UPLOAD_BYTES` | photo limit (default 5 MB) |
+
+## Run
 
 ```bash
-sudo apt -y install python3-venv python3-pip
-```
-
-```bash
-sudo mkdir -p /opt/dipti/
-cd /opt/dipti/
-git clone https://github.com/saifulislam88/fullstack-app-linux.git
-```
-
-```bash
-cd /opt/dipti/fullstack-app-linux/backend/
-python3 -m venv venv
-source venv/bin/activate
 pip install -r requirements.txt
+export JWT_SECRET=... DB_PASSWORD=... ADMIN_PASSWORD=...
+python -m alembic upgrade head
+python -m uvicorn app:app --host 0.0.0.0 --port 8000
 ```
 
-```bash
-cp /opt/dipti/fullstack-app-linux/backend/.env.example /opt/dipti/fullstack-app-linux/backend/.env
-```
+## Tests
 
 ```bash
-vim /opt/dipti/fullstack-app-linux/backend/.env
-```
-
-```bash
-DB_HOST=192.168.1.16
-DB_PORT=3306
-DB_NAME=dipti_portal
-DB_USER=dipti
-DB_PASSWORD=changeme
-JWT_SECRET=9b15f2b6b5e08df0c2b8f77a6cfc3f83f55d28b4db74cfb5a1d8c3eaf2c98271
-UPLOAD_DIR=/opt/dipti/fullstack-app-linux/uploads
-```
-
-```bash
-mkdir -p /opt/dipti/fullstack-app-linux/uploads
-sudo chown -R www-data:www-data /opt/dipti/fullstack-app-linux/backend
-```
-
-### nfs mount in all backend nodes
-
-```bash
-sudo apt -y install nfs-common
-sudo mount -t nfs 192.168.1.17:/srv/dipti-uploads /opt/dipti/fullstack-app-linux/uploads
-#for permanent mount
-#echo "10.0.0.21:/srv/dipti-uploads /opt/dipti/fullstack-app-linux/uploads nfs defaults,_netdev 0 0" | sudo tee -a /etc/fstab
-sudo mount -a
-df -hT
-sudo mkdir -p /opt/dipti/fullstack-app-linux/uploads/students
-```
-
-## Daemon service creation for backend
-```bash
-vim /etc/systemd/system/dipti-backend.service
-```
-
-
-```bash
-[Unit]
-Description=DIPTI Backend (FastAPI v2)
-After=network.target mariadb.service
-
-[Service]
-WorkingDirectory=/opt/dipti/fullstack-app-linux/backend/
-Environment="PYTHONPATH=/opt/dipti/fullstack-app-linux/backend/"
-EnvironmentFile=/opt/dipti/fullstack-app-linux/backend/.env
-ExecStart=/opt/dipti/fullstack-app-linux/backend/venv/bin/python -m uvicorn app:app --host 0.0.0.0 --port 8000
-User=www-data
-Group=www-data
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
-```
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now dipti-backend
+python -m pytest tests -q     # runs on SQLite, no DB needed
 ```

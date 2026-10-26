@@ -1,2 +1,12 @@
-<% function layout(name){ include(name) } %>
-<section class="card"><h2>Student Login</h2><% if (error) { %><div class="error"><%= error %></div><% } %><form method="POST" action="/student/login"><label>Email<input type="email" name="email" required></label><label>Password<input type="password" name="password" required></label><button class="btn" type="submit">Login</button></form></section>
+<section class="card">
+  <h2>Student Login</h2>
+  <% if (registered) { %><div class="ok">Registration successful. Please log in.</div><% } %>
+  <% if (error) { %><div class="error"><%= error %></div><% } %>
+  <form method="POST" action="/student/login">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <label>Email<input type="email" name="email" required></label>
+    <label>Password<input type="password" name="password" required></label>
+    <button class="btn" type="submit">Login</button>
+  </form>
+  <p class="muted">No account yet? <a href="/student/register">Register</a></p>
+</section>

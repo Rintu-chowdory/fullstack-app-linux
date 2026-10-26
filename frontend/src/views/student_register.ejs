@@ -1,21 +1,18 @@
-<!DOCTYPE html>
-<html>
-<head><title>Student Register</title></head>
-<body>
-  <h1>Student Register</h1>
-  <% if (error) { %>
-    <p style="color:red"><%= error %></p>
-  <% } %>
+<section class="card">
+  <h2>Student Registration</h2>
+  <% if (error) { %><div class="error"><%= error %></div><% } %>
   <form method="POST" action="/student/register" enctype="multipart/form-data">
-    <input name="name" placeholder="Name" required /><br/>
-    <input name="institute" placeholder="Institute" required /><br/>
-    <input name="batch" placeholder="Batch" required /><br/>
-    <input name="course_name" placeholder="Course Name" required /><br/>
-    <input name="module" placeholder="Module" required /><br/>
-    <input name="email" type="email" placeholder="Email" required /><br/>
-    <input name="password" type="password" placeholder="Password" required /><br/>
-    <input name="photo" type="file" accept="image/png, image/jpeg" required /><br/>
-    <button type="submit">Register</button>
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <div class="grid">
+      <label>Name<input name="name" required value="<%= values.name || '' %>"></label>
+      <label>Institute<input name="institute" required value="<%= values.institute || '' %>"></label>
+      <label>Batch<input name="batch" required value="<%= values.batch || '' %>"></label>
+      <label>Course Name<input name="course_name" required value="<%= values.course_name || '' %>"></label>
+      <label>Module<input name="module" required value="<%= values.module || '' %>"></label>
+      <label>Email<input type="email" name="email" required value="<%= values.email || '' %>"></label>
+      <label>Password<input type="password" name="password" required minlength="8"></label>
+      <label>Profile photo<input type="file" name="photo" accept="image/jpeg,image/png" required></label>
+    </div>
+    <button class="btn" type="submit">Register</button>
   </form>
-</body>
-</html>
+</section>

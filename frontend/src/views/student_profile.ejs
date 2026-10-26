@@ -1,2 +1,16 @@
-<% function layout(name){ include(name) } %>
-<section class="card"><h2>My Profile</h2><div class="profile"><img class="avatar" src="<%= me.photo_url %>" alt="Profile picture"><div><p><strong>Name:</strong> <%= me.name %></p><p><strong>Email:</strong> <%= me.email %></p><p><strong>Institute:</strong> <%= me.institute %></p><p><strong>Batch:</strong> <%= me.batch %></p><p><strong>Course:</strong> <%= me.course_name %></p><p><strong>Module:</strong> <%= me.module %></p></div></div></section>
+<section class="card profile">
+  <h2>My Profile</h2>
+  <div class="profile-flex">
+    <% if (me.photo_url) { %>
+      <img class="avatar" src="<%= photoBase + me.photo_url %>" alt="Profile photo">
+    <% } %>
+    <dl class="details">
+      <dt>Name</dt><dd><%= me.name %></dd>
+      <dt>Email</dt><dd><%= me.email %></dd>
+      <dt>Institute</dt><dd><%= me.institute %></dd>
+      <dt>Batch</dt><dd><%= me.batch %></dd>
+      <dt>Course</dt><dd><%= me.course_name %></dd>
+      <dt>Module</dt><dd><%= me.module %></dd>
+    </dl>
+  </div>
+</section>

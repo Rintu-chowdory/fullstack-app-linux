@@ -1,0 +1,51 @@
+# Render free-tier deployment (Postgres, because Render has no free MySQL).
+# NOTE: the free Postgres instance expires 30 days after creation.
+# Push the repo to GitHub, then: Render Dashboard -> New -> Blueprint -> select repo.
+services:
+  - type: web
+    name: dipti-backend
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt && python -m alembic upgrade head
+    startCommand: python -m uvicorn app:app --host 0.0.0.0 --port $PORT --workers 2
+    healthCheckPath: /healthz
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: dipti-db
+          property: connectionString
+      - key: UPLOAD_DIR
+        value: /opt/render/project/src/uploads
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ADMIN_PASSWORD
+        sync: false          # set once in the dashboard
+      - key: CORS_ORIGINS
+        sync: false          # the frontend service URL
+
+  - type: web
+    name: dipti-frontend
+    runtime: node
+    plan: free
+    rootDir: frontend
+    buildCommand: npm ci --omit=dev
+    startCommand: node src/server.js
+    healthCheckPath: /healthz
+    envVars:
+      - key: BACKEND_API_BASE_URL
+        sync: false          # https://dipti-backend.onrender.com
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: SESSION_STORE
+        value: "off"         # single free instance; Postgres can't run mysql sessions
+      - key: COOKIE_SECURE
+        value: "1"
+      - key: TRUST_PROXY
+        value: "1"
+
+databases:
+  - name: dipti-db
+    plan: free
+    databaseName: dipti_portal
+    user: dipti

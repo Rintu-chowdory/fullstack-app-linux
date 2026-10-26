@@ -1,0 +1,32 @@
+<section class="card wide">
+  <h2>Registered Students (<%= total %>)</h2>
+  <form method="GET" action="/students" class="search">
+    <input name="search" placeholder="Search name, email or batch" value="<%= search %>">
+    <button class="btn btn-outline" type="submit">Search</button>
+  </form>
+  <% if (students.length === 0) { %>
+    <p class="muted">No students found.</p>
+  <% } else { %>
+  <table>
+    <thead><tr><th>ID</th><th>Photo</th><th>Name</th><th>Email</th><th>Batch</th><th>Course</th><th>Module</th></tr></thead>
+    <tbody>
+      <% students.forEach(s => { %>
+      <tr>
+        <td><%= s.id %></td>
+        <td><% if (s.photo_url) { %><img class="thumb" src="<%= photoBase + s.photo_url %>" alt=""><% } else { %>-<% } %></td>
+        <td><%= s.name %></td>
+        <td><%= s.email %></td>
+        <td><%= s.batch %></td>
+        <td><%= s.course_name %></td>
+        <td><%= s.module %></td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <nav class="pagination">
+    <% if (page > 1) { %><a href="/students?page=<%= page - 1 %>&search=<%= encodeURIComponent(search) %>">&laquo; Prev</a><% } %>
+    <span>Page <%= page %> / <%= totalPages %></span>
+    <% if (page < totalPages) { %><a href="/students?page=<%= page + 1 %>&search=<%= encodeURIComponent(search) %>">Next &raquo;</a><% } %>
+  </nav>
+  <% } %>
+</section>
