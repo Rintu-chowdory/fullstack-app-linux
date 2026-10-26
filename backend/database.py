@@ -7,9 +7,16 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 load_dotenv()
 
 
+def normalize_database_url(url: str) -> str:
+    """SQLAlchemy 2.x rejects the postgres:// scheme Render provides."""
+    if url.startswith("postgres://"):
+        return "postgresql://" + url[len("postgres://"):]
+    return url
+
+
 def build_database_url() -> str:
     """DATABASE_URL wins; otherwise assemble from DB_* parts."""
-    url = os.getenv("DATABASE_URL", "").strip()
+    url = normalize_database_url(os.getenv("DATABASE_URL", "").strip())
     if url:
         return url
     host = os.getenv("DB_HOST", "127.0.0.1")

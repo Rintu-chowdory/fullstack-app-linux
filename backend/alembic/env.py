@@ -7,7 +7,7 @@ from sqlalchemy import create_engine
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database import build_database_url
+from database import build_database_url, normalize_database_url
 from models import Base
 
 config = context.config
@@ -18,7 +18,7 @@ target_metadata = Base.metadata
 
 
 def get_url() -> str:
-    url = os.getenv("DATABASE_URL", "").strip()
+    url = normalize_database_url(os.getenv("DATABASE_URL", "").strip())
     return url or build_database_url()
 
 
