@@ -1,69 +1,22 @@
-## Step-by-Step `MariaDB` Installation and Setup
+# Database
 
-### 1. Install MariaDB Server and Client
-Update your package index and install MariaDB:
+MariaDB 10.11 (`dipti_portal`). Schema lives in **backend/alembic/versions/** as the
+single source of truth - there is no separate schema.sql anymore.
 
-```bash
-sudo apt -y install mariadb-server mariadb-client
-```
-
-### 2. Secure MariaDB Installation
-
-Run the secure installation script to set root password and apply security best practices:
+Apply migrations (dev stack and CI do this automatically via the `migrate` service):
 
 ```bash
-sudo mysql_secure_installation
-```
-  - Follow the prompts to:
-  - Set a root password
-  - Remove anonymous users
-  - Disallow remote root login
-  - Remove test databases
-  - Reload privilege tables
-
-### 3. Prepare Project Schema Directory and Download Schema File
-
-```bash
-mkdir /opt/dipti/
-cd /opt/dipti/
-git clone https://github.com/saifulislam88/fullstack-app-linux.git
-```
-### 4. Load Schema into MariaDB
-
-```bash
-sudo mysql -uroot -p < /opt/dipti/fullstack-app-linux/db/schema.sql
-```
-### 5. Create Application User
-Create a dedicated database user with full privileges on the project database:
-```bash
-sudo mysql -uroot -p -e "CREATE USER 'dipti'@'%' IDENTIFIED BY 'changeme'; \
-GRANT ALL PRIVILEGES ON dipti_portal.* TO 'dipti'@'%'; \
-FLUSH PRIVILEGES;"
-```
-### 6. Allow Remote Connections
-If your backend is running remotely, bind MariaDB to all interfaces:
-
-```bash
-sudo sed -i 's/^bind-address.*/bind-address = 0.0.0.0/' /etc/mysql/mariadb.conf.d/50-server.cnf
-sudo systemctl restart mariadb
+cd backend
+DATABASE_URL="mysql+pymysql://dipti:PASSWORD@127.0.0.1:3306/dipti_portal?charset=utf8mb4" \
+  python -m alembic upgrade head
 ```
 
-### 6. DB accessiblity testing from application server
+Create a new migration after changing `backend/models.py`:
 
 ```bash
-sudo apt -y install mariadb-client
+cd backend
+python -m alembic revision --autogenerate -m "describe change"
+python -m alembic upgrade head
 ```
-```bash
-mysql -h <DB_SERVER_IP> -u dipti -p
-```
-```bash
-SHOW DATABASES;
-USE dipti_portal;
-SHOW TABLES;
-SELECT NOW();
-```
-```bash
-mysql -h <DB_SERVER_IP> -u dipti -p'changeme' -e "SHOW DATABASES;"
-mysql -h <DB_SERVER_IP> -u dipti -p'changeme' -e "USE dipti_portal; SHOW TABLES;"
-mysql -udipti -p -h 192.168.1.16 -e "SELECT id,name,email FROM dipti_portal.students ORDER BY id DESC LIMIT 5
-```
+
+Backups: `scripts/backup-db.sh`.
