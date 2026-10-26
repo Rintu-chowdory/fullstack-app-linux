@@ -4,7 +4,8 @@ import tempfile
 import uuid
 
 os.environ["JWT_SECRET"] = os.environ.get("JWT_SECRET", "test-secret-for-ci")
-os.environ["ADMIN_PASSWORD"] = os.environ.get("ADMIN_PASSWORD", "admin-test-password")
+ADMIN_TEST_PASSWORD = "admin-test-password"
+os.environ["ADMIN_PASSWORD"] = ADMIN_TEST_PASSWORD
 os.environ["UPLOAD_DIR"] = tempfile.mkdtemp(prefix="dipti-uploads-")
 # per-test sqlite file DB
 _DB = os.path.join(tempfile.mkdtemp(prefix="dipti-db-"), "test.db")

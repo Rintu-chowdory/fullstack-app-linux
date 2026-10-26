@@ -66,25 +66,29 @@ jobs:
 
   integration:
     runs-on: ubuntu-latest
+    env:
+      JWT_SECRET: ci-secret-not-used-in-prod
+      SESSION_SECRET: ci-session-secret
+      ADMIN_PASSWORD: ci-admin-pass
+      DB_PASSWORD: cipass
     steps:
       - uses: actions/checkout@v4
       - name: Start full dev stack
-        env:
-          JWT_SECRET: ci-secret-not-used-in-prod
-          SESSION_SECRET: ci-session-secret
-          ADMIN_PASSWORD: ci-admin-pass
-          DB_PASSWORD: cipass
-        run: |
-          cp .env.example /dev/null  # envs come from above
-          docker compose up --build -d
+        run: docker compose up --build -d
       - name: Wait for frontend
         timeout-minutes: 3
         run: |
+          code=000
           for i in $(seq 1 60); do
-            curl -fsS http://127.0.0.1:3000/healthz >/dev/null 2>&1 && { echo "stack up"; exit 0; }
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/healthz || true)
+            [ "$code" = "200" ] && { echo "stack up"; exit 0; }
             sleep 2
           done
-          echo "stack did not come up"; docker compose logs --tail 40; exit 1
+          echo "stack did not come up (last healthz code: $code)"
+          docker compose ps
+          echo "--- backend logs ---"; docker compose logs --no-color --tail 40 backend
+          echo "--- frontend logs ---"; docker compose logs --no-color --tail 40 frontend
+          exit 1
       - name: Student journey (register + login + profile)
         run: |
           python -c "from PIL import Image; Image.new('RGB',(64,64)).save('/tmp/p.png'"

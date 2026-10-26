@@ -1,4 +1,4 @@
-from conftest import admin_headers, client, register_student
+from conftest import ADMIN_TEST_PASSWORD, admin_headers, client, register_student
 
 """End-to-end API tests (SQLite)."""
 
@@ -15,7 +15,7 @@ def test_readyz():
 
 
 def test_admin_login_ok():
-    r = client.post("/api/login", json={"username": "admin", "password": "admin-test-password"})
+    r = client.post("/api/login", json={"username": "admin", "password": ADMIN_TEST_PASSWORD})
     assert r.status_code == 200
     assert "token" in r.json()
 
