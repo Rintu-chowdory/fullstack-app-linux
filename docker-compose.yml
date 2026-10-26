@@ -45,7 +45,7 @@ services:
     container_name: dipti-backend
     restart: unless-stopped
     volumes:
-      - ./backend/uploads:/app/uploads
+      - backend_uploads:/app/uploads
     environment:
       DB_HOST: db
       DB_PORT: 3306
@@ -87,3 +87,4 @@ services:
 
 volumes:
   db_data:
+  backend_uploads:
